@@ -25,7 +25,7 @@ const JobList = () => {
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/jobs`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/jobs`);
       setJobs(response.data);
       setFilteredJobs(response.data);
     } catch (error) {
