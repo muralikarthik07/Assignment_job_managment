@@ -18,6 +18,10 @@ const CreateJob = () => {
 
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Get API URL with fallback
+  const API_URL = process.env.REACT_APP_API_URL || 'https://assignment-job-managment-production.up.railway.app';
 
   const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'];
 
@@ -39,10 +43,20 @@ const CreateJob = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
-      const response = await axios.post('/api/jobs', formData);
-      console.log('Job created:', response.data);
+      console.log('Creating job with data:', formData);
+      console.log('API URL:', `${API_URL}/api/jobs`);
+      
+      const response = await axios.post(`${API_URL}/api/jobs`, formData, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Job created successfully:', response.data);
       setShowModal(true);
       
       // Reset form
@@ -59,15 +73,30 @@ const CreateJob = () => {
       });
     } catch (error) {
       console.error('Error creating job:', error);
-      alert('Error creating job. Please try again.');
+      
+      // More detailed error handling
+      if (error.code === 'ECONNABORTED') {
+        setError('Request timeout. Please check your internet connection.');
+      } else if (error.response) {
+        setError(`Server error: ${error.response.status} - ${error.response.data?.error || error.response.statusText}`);
+      } else if (error.request) {
+        setError('Cannot connect to server. Please check if the backend is running.');
+      } else {
+        setError('An unexpected error occurred while creating the job.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleSaveDraft = () => {
-    localStorage.setItem('jobDraft', JSON.stringify(formData));
-    alert('Draft saved successfully!');
+    try {
+      localStorage.setItem('jobDraft', JSON.stringify(formData));
+      alert('Draft saved successfully!');
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      alert('Error saving draft. Please try again.');
+    }
   };
 
   const closeModal = () => {
@@ -79,6 +108,20 @@ const CreateJob = () => {
     <div className="create-job-container">
       <form onSubmit={handleSubmit} className="create-job-form">
         <h2 className="form-title">Create Job Opening</h2>
+
+        {/* Error Display */}
+        {error && (
+          <div style={{
+            padding: '1rem',
+            backgroundColor: '#fdf2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '4px',
+            color: '#e74c3c',
+            marginBottom: '1rem'
+          }}>
+            <strong>Error:</strong> {error}
+          </div>
+        )}
 
         <div className="form-row">
           <div className="form-group">

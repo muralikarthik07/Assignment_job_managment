@@ -2,17 +2,20 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import JobCard from './JobCard';
 
-
 const JobList = () => {
   const [jobs, setJobs] = useState([]);
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     jobTitle: '',
     location: '',
     jobType: '',
-    salary: 0 // Changed default to 0 to show all jobs initially
+    salary: 0
   });
+
+  // Get API URL with fallback
+  const API_URL = process.env.REACT_APP_API_URL || 'https://assignment-job-managment-production.up.railway.app';
 
   useEffect(() => {
     fetchJobs();
@@ -25,11 +28,44 @@ const JobList = () => {
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/jobs`);
+      setError(null);
+      
+      console.log('Fetching jobs from:', `${API_URL}/api/jobs`);
+      
+      // First test if backend is reachable
+      const healthResponse = await axios.get(`${API_URL}/api/health`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Health check successful:', healthResponse.data);
+      
+      // If health check passes, fetch jobs
+      const response = await axios.get(`${API_URL}/api/jobs`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Jobs fetched successfully:', response.data);
       setJobs(response.data);
       setFilteredJobs(response.data);
     } catch (error) {
       console.error('Error fetching jobs:', error);
+      
+      // More detailed error handling
+      if (error.code === 'ECONNABORTED') {
+        setError('Request timeout. Please check your internet connection.');
+      } else if (error.response) {
+        setError(`Server error: ${error.response.status} - ${error.response.statusText}`);
+      } else if (error.request) {
+        setError('Cannot connect to server. Please check if the backend is running.');
+      } else {
+        setError('An unexpected error occurred.');
+      }
     } finally {
       setLoading(false);
     }
@@ -54,19 +90,16 @@ const JobList = () => {
       filtered = filtered.filter(job => job.job_type === filters.jobType);
     }
 
-    // Apply salary filter only if salary is greater than 0
     if (filters.salary > 0) {
       filtered = filtered.filter(job => {
         if (!job.salary_range) return false;
         
-        // Extract numbers from salary range (assuming format like "₹50k - ₹80k")
         const salaryMatch = job.salary_range.match(/₹?(\d+)k?\s*-\s*₹?(\d+)k?/);
         if (!salaryMatch) return false;
         
         const minSalary = parseInt(salaryMatch[1], 10);
         const maxSalary = parseInt(salaryMatch[2], 10);
         
-        // Check if selected salary falls within the job's salary range
         return filters.salary >= minSalary && filters.salary <= maxSalary;
       });
     }
@@ -95,14 +128,51 @@ const JobList = () => {
       jobTitle: '',
       location: '',
       jobType: '',
-      salary: 0 // Reset to 0 to show all jobs
+      salary: 0
     });
+  };
+
+  const retryFetch = () => {
+    fetchJobs();
   };
 
   if (loading) {
     return (
       <div className="loading">
         <h2>Loading jobs...</h2>
+        <p>Connecting to backend at: {API_URL}</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="error-container" style={{ 
+        padding: '2rem', 
+        textAlign: 'center', 
+        color: '#e74c3c',
+        backgroundColor: '#fdf2f2',
+        border: '1px solid #fecaca',
+        borderRadius: '8px',
+        margin: '2rem'
+      }}>
+        <h2>Connection Error</h2>
+        <p>{error}</p>
+        <p><strong>Backend URL:</strong> {API_URL}</p>
+        <button 
+          onClick={retryFetch}
+          style={{
+            padding: '0.5rem 1rem',
+            backgroundColor: '#3498db',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            marginTop: '1rem'
+          }}
+        >
+          Retry Connection
+        </button>
       </div>
     );
   }

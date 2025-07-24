@@ -3,37 +3,46 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'https://assignment-job-managment.vercel.app', // general Vercel domain
-  'http://localhost:3000'
-];
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// CORS Configuration - UPDATED
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS: ' + origin));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
+  origin: [
+    'http://localhost:3000',
+    'https://assignment-job-manag-a41e5.vercel.app',
+    'https://assignment-job-manag-a41e5.vercel.app/',
+    process.env.FRONTEND_URL
+  ].filter(Boolean), // Remove any undefined values
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200 // For legacy browser support
 }));
 
+// Handle preflight requests
+app.options('*', cors());
+
+// Add this route to test backend connectivity
+app.get('/api/health', (req, res) => {
+  res.json({ message: 'Backend is running successfully!', timestamp: new Date().toISOString() });
+});
+
+// Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// MySQL Connection
+// MySQL Connection - UPDATED with better error handling
 const db = mysql.createConnection({
   host: process.env.MYSQLHOST || 'localhost',
   user: process.env.MYSQLUSER || 'root',
   password: process.env.MYSQLPASSWORD || '',
   database: process.env.MYSQLDATABASE || 'job_portal',
-  port: process.env.MYSQLPORT || 3306
+  port: process.env.MYSQLPORT || 3306,
+  connectTimeout: 60000,
+  acquireTimeout: 60000,
+  timeout: 60000
 });
 
 // Connect to MySQL
@@ -99,6 +108,8 @@ db.connect((err) => {
 
 // Get all jobs with filters
 app.get('/api/jobs', (req, res) => {
+  console.log('GET /api/jobs called with query:', req.query);
+  
   let query = 'SELECT * FROM jobs WHERE 1=1';
   const params = [];
 
@@ -128,6 +139,7 @@ app.get('/api/jobs', (req, res) => {
       console.error('Error fetching jobs:', err);
       res.status(500).json({ error: 'Internal server error' });
     } else {
+      console.log(`Returning ${results.length} jobs`);
       res.json(results);
     }
   });
@@ -152,6 +164,8 @@ app.get('/api/jobs/:id', (req, res) => {
 
 // Create new job
 app.post('/api/jobs', (req, res) => {
+  console.log('POST /api/jobs called with body:', req.body);
+  
   const {
     job_title,
     company_name,
@@ -247,6 +261,8 @@ app.delete('/api/jobs/:id', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Frontend URL: ${process.env.FRONTEND_URL}`);
 });
